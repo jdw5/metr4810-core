@@ -184,7 +184,6 @@ void TIM2_IRQHandler(void) {
 
         irremote_recv();
     }   
-
 }
 
 /**
