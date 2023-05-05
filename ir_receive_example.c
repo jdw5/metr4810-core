@@ -27,7 +27,7 @@ uint32_t lastTime;
  * 
  *  PB10 - timer 2 channel 3
 */
-extern void reg_irremote_init() { 
+extern void irremote_init() { 
 
     // Set global vars
     keyPressedFlag = 0;
@@ -113,7 +113,7 @@ int array_index_of(uint32_t *array, int length, uint32_t item) {
  * ISR for input capture for IR remote. 
  * Calculates the key pressed/recieved over IR using input capture.
 */
-void reg_irremote_recv() { 
+void irremote_recv() { 
 
     // Read CCR value (resets IF flag)
     uint32_t current = TIM2->CCR3;
@@ -182,7 +182,7 @@ void TIM2_IRQHandler(void) {
     // Call callback if channel 3 triggered an interrupt
     if ((TIM2->SR & TIM_SR_CC3IF) == TIM_SR_CC3IF) {
 
-        reg_irremote_recv();
+        irremote_recv();
     }   
 
 }
@@ -194,7 +194,7 @@ void TIM2_IRQHandler(void) {
  * If no key has been pressed, this function returns a 0 and does not 
  * modify the value varaible.
 */
-extern int reg_irremote_readkey(char *value) { 
+extern int irremote_readkey(char *value) { 
 
     if (keyPressedFlag) {
 
