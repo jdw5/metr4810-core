@@ -11,6 +11,7 @@
 #define TIMER_COUNTER 512000
 #define MAX_WIDTH 10000
 #define THRESHOLD 2500
+
 // Value gets progressively stored in this value as it gets recieved
 uint32_t inputCode;
 
