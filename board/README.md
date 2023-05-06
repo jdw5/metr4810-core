@@ -19,3 +19,12 @@
 
 ## Functionality (High Level)
 - Read in IR signal using timer alternate function
+
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_SPEED_FREQ_HIGH);
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
+	GPIO_InitStruct.Pin = GPIO_PIN_1;
+	GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+	GPIO_InitStruct.Alternate = GPIO_AF1_TIM2;
+	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
