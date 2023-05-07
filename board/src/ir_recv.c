@@ -3,10 +3,12 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "nec_prot.h"
+#include "ir_recv.h"
 #include "main.h"
 
-//------------------------------------------------------------------------------
+volatile irparams_t irparams;
+volatile uint8_t[] irresults
+
 static inline int in_range(uint32_t val, uint32_t min, uint32_t max)
 {
     if (val >= min && val <= max)
@@ -14,7 +16,6 @@ static inline int in_range(uint32_t val, uint32_t min, uint32_t max)
     return 0;
 }
 
-//------------------------------------------------------------------------------
 int nec_decode_raw_bits(const nec_waveform_t* waveform, uint32_t * raw_bits)
 {
     int sample_idx = 0;
@@ -87,70 +88,11 @@ int nec_decode(const nec_waveform_t * waveform, nec_decoded_data_t * res)
     return NEC_SAMPLES;
 }
 
-//------------------------------------------------------------------------------
-void nec_encode(uint8_t address, uint8_t command, nec_waveform_t * waveform)
-{
-    uint8_t data_byte[4];
-
-    int sample_idx = 0;
-
-    waveform->samples[sample_idx++] = NEC_LEAD_PULSE_US;
-    waveform->samples[sample_idx++] = NEC_LEAD_SPACE_US;
-
-    data_byte[0] = address;
-    data_byte[1] = ~address;
-    data_byte[2] = command;
-    data_byte[3] = ~command;
-
-    for (int b = 0; b < 4; b++) {
-        for (int i = 0; i < 8; i++) {
-            int data_bit = (data_byte[b] >> i) & 0x1;
-
-            waveform->samples[sample_idx++] = NEC_PULSE_US;
-
-            if (data_bit)
-                waveform->samples[sample_idx++] = NEC_SPACE_1_US;
-            else
-                waveform->samples[sample_idx++] = NEC_SPACE_0_US;
-        }
-    }
-
-    waveform->samples[sample_idx] = NEC_PULSE_US;
-
-    waveform->length = NEC_SAMPLES;
-}
-
-// Code based on https://github.com/z3t0/Arduino-IRremote !
-
 // Allow all parts of the code access to the ISR data
 // NB. The data can be changed by the ISR at any time, even mid-function
 // Therefore we declare it as "volatile" to stop the compiler/CPU caching it
 volatile irparams_t irparams;
 volatile ir_decode_results irresults;
-
-//+=============================================================================
-// Decodes the received IR message
-// Returns 0 if no data ready, 1 if data ready.
-// Results of decoding are stored in results
-//
-int IRrecv_decode (ir_decode_results* results)
-{
-	results->rawbuf   = irparams.rawbuf;
-	results->rawlen   = irparams.rawlen;
-	results->overflow = irparams.overflow;
-
-	if (irparams.rcvstate != IR_STATE_STOP)  return 0 ;
-
-	//TODO ???
-	// decodeHash returns a hash on any input.
-	// Thus, it needs to be last in the list.
-	// If you add any decodes, add them before this.
-	//if (IRrecv_decodeHash(results))  return 1 ;
-
-	// Throw away and start over
-	IRrecv_resume();
-	return 0;
-}
 
 //+=============================================================================
 void IRrecv_IRrecvInit (GPIO_TypeDef* recvpinport, uint16_t recvpin)
@@ -160,29 +102,11 @@ void IRrecv_IRrecvInit (GPIO_TypeDef* recvpinport, uint16_t recvpin)
 	irparams.blinkflag = 0;
 }
 
-void IRrecv_IRrecvInitBlink (GPIO_TypeDef* recvpinport, uint16_t recvpin, GPIO_TypeDef* blinkpinport, uint16_t blinkpin)
-{
-	irparams.recvpinport = recvpinport;
-	irparams.recvpin = recvpin;
-	irparams.blinkpinport = blinkpinport;
-	irparams.blinkpin = blinkpin;
-
-	GPIO_InitTypeDef GPIO_InitStruct;
-	GPIO_InitStruct.Pin = blinkpin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_PULLUP;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-	HAL_GPIO_Init(blinkpinport, &GPIO_InitStruct);
-
-	irparams.blinkflag = 0;
-}
 
 
-
-//+=============================================================================
 // initialization
 //
-void  IRrecv_enableIRIn()
+void IRrecv_enableIRIn()
 {
 	// Initialize state machine variables
 	irparams.rcvstate = IR_STATE_IDLE;
@@ -220,17 +144,13 @@ void  IRrecv_enableIRIn()
 	}
 }
 
-//+=============================================================================
 // Return if receiving new IR signals
-//
 uint8_t IRrecv_isIdle ( )
 {
 	return (irparams.rcvstate == IR_STATE_IDLE || irparams.rcvstate == IR_STATE_STOP) ? 1 : 0;
 }
 
-//+=============================================================================
 // Restart the ISR state machine
-//
 void IRrecv_resume ( )
 {
 	irparams.rcvstate = IR_STATE_IDLE;

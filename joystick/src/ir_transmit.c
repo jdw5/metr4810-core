@@ -24,7 +24,6 @@ void ir_transmit(uint32_t buf[], uint16_t len, uint16_t khz) {
 
 // Sends an IR mark for the specified number of microseconds.
 // The mark output is modulated at the PWM frequency.
-//
 void ir_send_mark(uint32_t time) {
 	HAL_TIM_OC_Start(&htim3, TIM_CHANNEL_2); // Enable PWM output
 
@@ -36,7 +35,6 @@ void ir_send_mark(uint32_t time) {
 // Leave pin off for time (given in microseconds)
 // Sends an IR space for the specified number of microseconds.
 // A space is no output, so the PWM output is disabled.
-//
 void ir_send_space(uint32_t time) {
 	HAL_TIM_OC_Stop(&htim3, TIM_CHANNEL_2); // Disable PWM output
 
