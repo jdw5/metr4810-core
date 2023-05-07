@@ -1,63 +1,54 @@
-/*
- * Copyright (c) 2022 Jan Privara
- * SPDX-License-Identifier: MIT
- */
-
-#include "nec_prot.h"
+#include "ir_transmit.h"
 #include "main.h"
 
-#include "stm32l4xx_hal_tim.h"
-#include "tim.h"
+TIM_HandleTypeDef htim3;
 
-// Code based on https://github.com/z3t0/Arduino-IRremote !
+#define US_DELAY(us) DWT_Delay_us(us)
 
 //+=============================================================================
-void IRsend_sendRaw (const unsigned int buf[], unsigned int len, unsigned int khz)
-{
+void ir_transmit(uint32_t buf[], uint16_t len, uint16_t khz) {
 	// Set IR carrier frequency
-	IRsend_enableIROut(khz);
+	ir_enable_transmit(khz);
 
-	for (unsigned int i = 0;  i < len;  i++)
-	{
+	for (uint16_t i = 0;  i < len;  i++) {
 		if (i & 1) {
-            IRsend_space(buf[i]) 
-        };
-		else {
-            IRsend_mark(buf[i]) 
-        };
+            ir_send_space(buf[i]);
+        } else {
+            ir_send_mark(buf[i]);
+        }
 	}
 
-	IRsend_space(0);  // Always end with the LED off
+	ir_send_space(0);  // Always end with the LED off
 }
 
 
-//+=============================================================================
 // Sends an IR mark for the specified number of microseconds.
 // The mark output is modulated at the PWM frequency.
 //
-void IRsend_mark(unsigned int time)
-{
+void ir_send_mark(uint32_t time) {
 	HAL_TIM_OC_Start(&htim3, TIM_CHANNEL_2); // Enable PWM output
-	if (time > 0) HAL_Delay(time/10);
+
+	if (time > 0) {
+        US_DELAY(time)
+    };
 }
 
-//+=============================================================================
 // Leave pin off for time (given in microseconds)
 // Sends an IR space for the specified number of microseconds.
 // A space is no output, so the PWM output is disabled.
 //
-void IRsend_space (unsigned int time)
-{
+void ir_send_space(uint32_t time) {
 	HAL_TIM_OC_Stop(&htim3, TIM_CHANNEL_2); // Disable PWM output
-	if (time > 0) HAL_Delay(time/10);
+
+	if (time > 0) {
+        US_DELAY(time);
+    }
 }
 
-//+=============================================================================
 // Enables IR output.  The khz value controls the modulation frequency in kilohertz.
 // To turn the output on and off, we leave the PWM running, but connect and disconnect the output pin.
 //
-void IRsend_enableIROut (uint32_t khz)
-{
+void ir_enable_transmit(uint16_t khz) {
 	//TODO!!! ?
 	// Disable the TIM2 Interrupt (which is used for receiving IR)
 	//HAL_NVIC_DisableIRQ(TIM2_IRQn);
@@ -113,18 +104,18 @@ void IRsend_enableIROut (uint32_t khz)
 	TIM_SET_CAPTUREPOLARITY(&htim3, TIM_CHANNEL_2, TIM_CCxN_ENABLE | TIM_CCx_ENABLE );
 
 	HAL_TIM_OC_Start(&htim3, TIM_CHANNEL_2); // start generating IR carrier
+
+    DWT_Delay_Init();
 }
 
-
-
-void nec_encode(uint8_t address, uint8_t command, nec_waveform_t * waveform)
+void nec_encode(uint8_t address, uint8_t command, irnec_t* signal)
 {
     uint8_t data_byte[4];
 
     int sample_idx = 0;
 
-    waveform->samples[sample_idx++] = NEC_LEAD_PULSE_US;
-    waveform->samples[sample_idx++] = NEC_LEAD_SPACE_US;
+    signal->samples[sample_idx++] = NEC_LEAD_PULSE_US;
+    signal->samples[sample_idx++] = NEC_LEAD_SPACE_US;
 
     data_byte[0] = address;
     data_byte[1] = ~address;
@@ -135,16 +126,16 @@ void nec_encode(uint8_t address, uint8_t command, nec_waveform_t * waveform)
         for (int i = 0; i < 8; i++) {
             int data_bit = (data_byte[b] >> i) & 0x1;
 
-            waveform->samples[sample_idx++] = NEC_PULSE_US;
+            signal->samples[sample_idx++] = NEC_PULSE_US;
 
             if (data_bit)
-                waveform->samples[sample_idx++] = NEC_SPACE_1_US;
+                signal->samples[sample_idx++] = NEC_SPACE_1_US;
             else
-                waveform->samples[sample_idx++] = NEC_SPACE_0_US;
+                signal->samples[sample_idx++] = NEC_SPACE_0_US;
         }
     }
 
-    waveform->samples[sample_idx] = NEC_PULSE_US;
+    signal->samples[sample_idx] = NEC_PULSE_US;
 
-    waveform->length = NEC_SAMPLES;
+    signal->length = NEC_SAMPLES;
 }

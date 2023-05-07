@@ -15,7 +15,7 @@ static inline int in_range(uint32_t val, uint32_t min, uint32_t max)
 }
 
 //------------------------------------------------------------------------------
-int nec_decode_raw_bits(const nec_waveform_t * waveform, uint32_t * raw_bits)
+int nec_decode_raw_bits(const nec_waveform_t* waveform, uint32_t * raw_bits)
 {
     int sample_idx = 0;
 
@@ -118,4 +118,15 @@ void nec_encode(uint8_t address, uint8_t command, nec_waveform_t * waveform)
     waveform->samples[sample_idx] = NEC_PULSE_US;
 
     waveform->length = NEC_SAMPLES;
+}
+
+void nec_send(nec_waveform_t* waveform, int tim) {
+    for (int i = 0; i < waveform->length; i++) {
+        if (i % 2 == 1) {
+            // High
+        } else {
+            // Space
+        }
+    }
+
 }
