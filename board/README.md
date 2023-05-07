@@ -11,11 +11,11 @@
 ## Pins
 | Processor Pin | Type | Use | Alternate Functions |
 | ------------- | ---- |---- | ------------------- |
-| PB4 | PWM Input | Read IR values from transmitter | TIM2_CHAN2 |
-| PA1 | PWM Output | Motor R | TIM2_CHAN2 |
-| PA3 | PWM Output | Motor R | TIM2_CHAN4 |
-| PA5 | PWM Output | Motor R | TIM2_CHAN1 |
-| PB10 | PWM Output | Motor R | TIM2_CHAN3 |
+| PB5 | PWM Input | Read IR values from transmitter | TIM16_CHAN2 |
+| PA1 | PWM Output | Motor Right Forward | TIM2_CHAN2 |
+| PA3 | PWM Output | Motor Right Reverse | TIM2_CHAN4 |
+| PA5 | PWM Output | Motor Left Forward | TIM2_CHAN1 |
+| PB10 | PWM Output | Motor Left Reverse | TIM2_CHAN3 |
 
 ## Functionality (High Level)
 - Read in IR signal using timer alternate function
