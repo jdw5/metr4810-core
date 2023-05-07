@@ -110,6 +110,9 @@ int main(void)
   {
 	  valueX = get_joystick_x();
 	  valueY = get_joystick_y();
+	  if (valueX > valueY) {
+
+	  }
 
     /* USER CODE END WHILE */
 
@@ -205,7 +208,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
-  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.NbrOfConversion = 1;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
@@ -226,6 +229,16 @@ static void MX_ADC1_Init(void)
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_10;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -350,22 +363,22 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 uint32_t get_joystick_x() {
-	ADC_ChannelConfTypeDef sConfigPrivate = {0};
-	sConfigPrivate.Rank = ADC_REGULAR_RANK_1;
-	sConfigPrivate.SamplingTime = ADC_SAMPLETIME_640CYCLES_5;
-	sConfigPrivate.Channel = JOYSTICK_X;
-	HAL_ADC_ConfigChannel(&hadc1, &sConfigPrivate);
+	ADC_ChannelConfTypeDef sConfig = {0};
+	sConfig.Rank = ADC_REGULAR_RANK_1;
+	sConfig.SamplingTime = ADC_SAMPLETIME_640CYCLES_5;
+	sConfig.Channel = JOYSTICK_X;
+	HAL_ADC_ConfigChannel(&hadc1, &sConfig);
 	HAL_ADC_Start(&hadc1);
 	HAL_ADC_PollForConversion(&hadc1,1000);
 	return HAL_ADC_GetValue(&hadc1);
 }
 
 uint32_t get_joystick_y() {
-	ADC_ChannelConfTypeDef sConfigPrivate = {0};
-	sConfigPrivate.Rank = ADC_REGULAR_RANK_1;
-	sConfigPrivate.SamplingTime = ADC_SAMPLETIME_640CYCLES_5;
-	sConfigPrivate.Channel = JOYSTICK_Y;
-	HAL_ADC_ConfigChannel(&hadc1, &sConfigPrivate);
+	ADC_ChannelConfTypeDef sConfig = {0};
+	sConfig.Rank = ADC_REGULAR_RANK_1;
+	sConfig.SamplingTime = ADC_SAMPLETIME_640CYCLES_5;
+	sConfig.Channel = JOYSTICK_Y;
+	HAL_ADC_ConfigChannel(&hadc1, &sConfig);
 	HAL_ADC_Start(&hadc1);
 	HAL_ADC_PollForConversion(&hadc1,1000);
 	return HAL_ADC_GetValue(&hadc1);
