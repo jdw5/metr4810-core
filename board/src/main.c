@@ -58,17 +58,18 @@
 #define DIR_RGT     2
 #define DIR_LFT     3
 
-#define MAIN_DELAY  200
-#define MOTOR_DELAY 20
+#define MAIN_DELAY  200 // 200ms to ensure enough time to process
+#define MOTOR_DELAY 20  // time to stop motors to prevent jolting
 
 
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define DEBUG_ON() HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-#define DEBUG_OFF() HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-#define DEBUG_TOGGLE() HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+#define DEBUG_ON() HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET)
+#define DEBUG_OFF() HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET)
+#define DEBUG_TOGGLE() HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13)
+#define READ_IR() HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4)
 
 #define RIGHT_MOTOR_FORWARD(value) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, (value * PERIOD) / 100)
 #define RIGHT_MOTOR_REVERSE(value) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, (value * PERIOD) / 100)
@@ -87,14 +88,14 @@
 #define TURN_CW_MED() RIGHT_MOTOR_FORWARD(SPEED_NONE); RIGHT_MOTOR_REVERSE(SPEED_MED); LEFT_MOTOR_FORWARD(SPEED_MED); LEFT_MOTOR_REVERSE(SPEED_NONE)
 #define TURN_CW_SLOW() RIGHT_MOTOR_FORWARD(SPEED_NONE); RIGHT_MOTOR_REVERSE(SPEED_SLOW); LEFT_MOTOR_FORWARD(SPEED_SLOW); LEFT_MOTOR_REVERSE(SPEED_NONE)
 
-#define TURN_CCW_FAST() RIGHT_MOTOR_FORWARD(SPEED_FAST); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(SPEED__NONE); LEFT_MOTOR_REVERSE(SPEED_FAST)
+#define TURN_CCW_FAST() RIGHT_MOTOR_FORWARD(SPEED_FAST); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(SPEED_NONE); LEFT_MOTOR_REVERSE(SPEED_FAST)
 #define TURN_CCW_MED() RIGHT_MOTOR_FORWARD(SPEED_MED); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(SPEED_NONE); LEFT_MOTOR_REVERSE(SPEED_MED)
-#define TURN_CCW_SLOW() RIGHT_MOTOR_FORWARD(SPEED_SLOW); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(SPEED__NONE); LEFT_MOTOR_REVERSE(SPEED_SLOW)
+#define TURN_CCW_SLOW() RIGHT_MOTOR_FORWARD(SPEED_SLOW); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(SPEED_NONE); LEFT_MOTOR_REVERSE(SPEED_SLOW)
 
 #define FORWARD(speed) RIGHT_MOTOR_FORWARD(speed); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(speed); LEFT_MOTOR_REVERSE(SPEED_NONE)
 #define REVERSE(speed) RIGHT_MOTOR_REVERSE(speed); RIGHT_MOTOR_FORWARD(SPEED_NONE); LEFT_MOTOR_REVERSE(speed); LEFT_MOTOR_FORWARD(SPEED_NONE)
 #define TURN_CW(speed) RIGHT_MOTOR_FORWARD(SPEED_NONE); RIGHT_MOTOR_REVERSE(speed); LEFT_MOTOR_FORWARD(speed); LEFT_MOTOR_REVERSE(SPEED_NONE)
-#define TURN_CCW(speed) RIGHT_MOTOR_FORWARD(speed); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(SPEED__NONE); LEFT_MOTOR_REVERSE(speed)
+#define TURN_CCW(speed) RIGHT_MOTOR_FORWARD(speed); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(SPEED_NONE); LEFT_MOTOR_REVERSE(speed)
 
 #define STOP() RIGHT_MOTOR_FORWARD(SPEED_NONE); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(SPEED_NONE); LEFT_MOTOR_REVERSE(SPEED_NONE)
 /* USER CODE END PM */
@@ -133,12 +134,12 @@ uint32_t receive_data (void)
 	   * than 4.5 ms space (HIGH)
 	   */
 	int check = 0;
-	  while (!(HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4))) {
+	  while (!READ_IR()) {
 		  // wait for the pin to go high.. 9ms LOW
 		  DWT_Delay_us(100);
 		  check++;
 	  };
-	  while ((HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4))) {
+	  while (READ_IR()) {
 		   // wait for the pin to go low.. 4.5ms HIGH
 		  if (check < 50) {
 			  return 0;
@@ -153,13 +154,11 @@ uint32_t receive_data (void)
 	   */
     
     uint8_t count;
-	  for (int i=0; i < 32; i++)
-	  {
+	  for (int i = 0; i < 32; i++) {
 		  count = 0;
+		  while (!READ_IR()); // wait for pin to go high.. this is 562.5us LOW
 
-		  while (!(HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4))); // wait for pin to go high.. this is 562.5us LOW
-
-		  while ((HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4)))  // count the space length while the pin is high
+		  while (READ_IR())  // count the space length while the pin is high
 		  {
 			  count++;
 			  DWT_Delay_us(100);
@@ -220,7 +219,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  while ((HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4)));   // Wait for the pin to go low indicating value received
+	  while (READ_IR());   // Wait for the pin to go low indicating value received
 	  data = receive_data();
 	  if (data > 0) {
 		  DEBUG_TOGGLE();
@@ -280,16 +279,16 @@ int main(void)
 
       switch (direction) {
         case DIR_FWD :
-          FORWARD(speed)
+          FORWARD(speed);
           break;
         case DIR_BCK :
-          REVERSE(speed)
+          REVERSE(speed);
           break;
         case DIR_LFT :
-          TURN_CCW(speed)
+          TURN_CCW(speed);
           break;
         case DIR_RGT :
-          TURN_CW(speed)
+          TURN_CW(speed);
           break;        
       }
     }
