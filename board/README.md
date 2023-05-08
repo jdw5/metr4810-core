@@ -11,20 +11,21 @@
 ## Pins
 | Processor Pin | Type | Use | Alternate Functions |
 | ------------- | ---- |---- | ------------------- |
-| PB5 | PWM Input | Read IR values from transmitter | TIM16_CHAN2 |
+| PB4 | GPIO Input | IR Receiver | - |
 | PA1 | PWM Output | Motor Right Forward | TIM2_CHAN2 |
 | PA3 | PWM Output | Motor Right Reverse | TIM2_CHAN4 |
 | PA5 | PWM Output | Motor Left Forward | TIM2_CHAN1 |
 | PB10 | PWM Output | Motor Left Reverse | TIM2_CHAN3 |
 
-## Functionality (High Level)
-- Read in IR signal using timer alternate function
-
-HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_SPEED_FREQ_HIGH);
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	GPIO_InitStruct.Pin = GPIO_PIN_1;
-	GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-	GPIO_InitStruct.Alternate = GPIO_AF1_TIM2;
-	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+## Command Values
+| Button | Decimal | Hex |
+| ------ | ------- | --- | 
+|    A   | 16720605 |     |
+|    B   | 16712445 |     |
+|    C   | 16761405 |     |
+|  FWD   | 16750695 |     |
+|  BCK   | 16726215 |     |
+|  LFT   | 16724175 |     |
+|  RGT   | 16743045 |     |
+|  PWR   | 16736925 |     |
+|  MID   | 16718055 |     |
