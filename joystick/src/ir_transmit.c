@@ -3,12 +3,18 @@
 
 TIM_HandleTypeDef htim3;
 
+// Macro for the DWT library which must be included
 #define US_DELAY(us) DWT_Delay_us(us)
 
-//+=============================================================================
+/**
+* @brief	Transmit the providied buffer over the IR
+* @param buf 
+* @param len
+* @param khz	
+*/
 void ir_transmit(uint32_t buf[], uint16_t len, uint16_t khz) {
 	// Set IR carrier frequency
-	ir_enable_transmit(khz);
+	//ir_enable_transmit(khz);
 
 	for (uint16_t i = 0;  i < len;  i++) {
 		if (i & 1) {
@@ -17,13 +23,15 @@ void ir_transmit(uint32_t buf[], uint16_t len, uint16_t khz) {
             ir_send_mark(buf[i]);
         }
 	}
-
-	ir_send_space(0);  // Always end with the LED off
+	// Send a low to signL the LED is no longer transmitting
+	ir_send_space(0);
 }
 
 
-// Sends an IR mark for the specified number of microseconds.
-// The mark output is modulated at the PWM frequency.
+/**
+* @brief 	Generate a high signal (1) for the specified time
+* @param time
+*/
 void ir_send_mark(uint32_t time) {
 	HAL_TIM_OC_Start(&htim3, TIM_CHANNEL_2); // Enable PWM output
 
@@ -32,9 +40,10 @@ void ir_send_mark(uint32_t time) {
     }
 }
 
-// Leave pin off for time (given in microseconds)
-// Sends an IR space for the specified number of microseconds.
-// A space is no output, so the PWM output is disabled.
+/**
+* @brief 	Generate a low signal (0) for the specified time
+* @param	time
+*/
 void ir_send_space(uint32_t time) {
 	HAL_TIM_OC_Stop(&htim3, TIM_CHANNEL_2); // Disable PWM output
 
@@ -46,15 +55,11 @@ void ir_send_space(uint32_t time) {
 // Enables IR output.  The khz value controls the modulation frequency in kilohertz.
 // To turn the output on and off, we leave the PWM running, but connect and disconnect the output pin.
 //
+/**
+* @brief 	Initialise the IR transmitter for output and configure modulation settings
+*			Modulation is done by turning the pin high and low
+*/
 void ir_enable_transmit(uint16_t khz) {
-	//TODO!!! ?
-	// Disable the TIM2 Interrupt (which is used for receiving IR)
-	//HAL_NVIC_DisableIRQ(TIM2_IRQn);
-
-	//------------------------------------------------------------------
-	// TIM3 initialization
-	//
-
 	GPIO_InitTypeDef GPIO_IR_TIMER_PWM;
 	TIM_OC_InitTypeDef IR_TIMER_PWM_CH;
 
@@ -106,6 +111,10 @@ void ir_enable_transmit(uint16_t khz) {
     DWT_Delay_Init();
 }
 
+/**
+* @brief 	Encode the provided address and command into the signal pointer
+*			The values in the signal data will be the time delay in microseconds
+*/
 void nec_encode(uint8_t address, uint8_t command, irnec_t* signal)
 {
     uint8_t data_byte[4];
