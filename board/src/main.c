@@ -53,6 +53,15 @@
 #define SPEED_SLOW  25
 #define SPEED_NONE  0
 
+#define DIR_FWD     0
+#define DIR_BCK     1
+#define DIR_RGT     2
+#define DIR_LFT     3
+
+#define MAIN_DELAY  200
+#define MOTOR_DELAY 20
+
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -82,7 +91,10 @@
 #define TURN_CCW_MED() RIGHT_MOTOR_FORWARD(SPEED_MED); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(SPEED_NONE); LEFT_MOTOR_REVERSE(SPEED_MED)
 #define TURN_CCW_SLOW() RIGHT_MOTOR_FORWARD(SPEED_SLOW); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(SPEED__NONE); LEFT_MOTOR_REVERSE(SPEED_SLOW)
 
-
+#define FORWARD(speed) RIGHT_MOTOR_FORWARD(speed); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(speed); LEFT_MOTOR_REVERSE(SPEED_NONE)
+#define REVERSE(speed) RIGHT_MOTOR_REVERSE(speed); RIGHT_MOTOR_FORWARD(SPEED_NONE); LEFT_MOTOR_REVERSE(speed); LEFT_MOTOR_FORWARD(SPEED_NONE)
+#define TURN_CW(speed) RIGHT_MOTOR_FORWARD(SPEED_NONE); RIGHT_MOTOR_REVERSE(speed); LEFT_MOTOR_FORWARD(speed); LEFT_MOTOR_REVERSE(SPEED_NONE)
+#define TURN_CCW(speed) RIGHT_MOTOR_FORWARD(speed); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(SPEED__NONE); LEFT_MOTOR_REVERSE(speed)
 
 #define STOP() RIGHT_MOTOR_FORWARD(SPEED_NONE); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(SPEED_NONE); LEFT_MOTOR_REVERSE(SPEED_NONE)
 /* USER CODE END PM */
@@ -108,6 +120,10 @@ static void MX_TIM2_Init(void);
 /* USER CODE BEGIN 0 */
 uint32_t data;
 
+/**
+* @brief Function to retrieve NEC encoded command
+* @retval Value received
+*/
 uint32_t receive_data (void)
 {
 	uint32_t code = 0x00;
@@ -130,7 +146,7 @@ uint32_t receive_data (void)
 	  }
 
 
-	  /* DATA Reception
+	  /*
 	   * We are only going to check the SPACE after 562.5us pulse
 	   * if the space is 562.5us, the bit indicates '0'
 	   * if the space is around 1.6ms, the bit is '1'
@@ -192,43 +208,94 @@ int main(void)
   DWT_Delay_Init ();
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
+  STOP();
+  DEBUG_OFF();
+  uint8_t speed = SPEED_SLOW;
+  uint8_t direction = DIR_FWD;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  STOP();
-  DEBUG_OFF();
-  while (1)
-  {
+  while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  while ((HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4)));   // wait for the pin to go low
+	  while ((HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4)));   // Wait for the pin to go low indicating value received
 	  data = receive_data();
 	  if (data > 0) {
 		  DEBUG_TOGGLE();
-	  }
+      switch (data) {
+        case CMD_A :
+          speed = SPEED_SLOW;
+          break;
 
-	  switch (data) {
-	  	  case 16750695:
-			  RIGHT_MOTOR_FORWARD(100);
-			  RIGHT_MOTOR_REVERSE(0);
-			  data = 0;
-			  break;
-	  	  case 16718055:
-	  		  STOP();
-	  		  data = 0;
-	  		  break;
-	  	  case 16726215:
-	  		  STOP();
-	  		  RIGHT_MOTOR_FORWARD(0);
-	  		  RIGHT_MOTOR_REVERSE(100);
-	  		  data = 0;
-	  		  break;
+        case CMD_B :
+          speed = SPEED_MED;
+          break;
 
-	  }
+        case CMD_C :
+          speed = SPEED_FAST;
+          break;
 
-	  HAL_Delay(200);
+        case CMD_FWD :
+          if (direction != DIR_FWD) {
+            STOP();
+            DWT_Delay_us(MOTOR_DELAY);
+          }
+          direction = DIR_FWD;
+          break;
+
+        case CMD_BCK :
+          if (direction != DIR_BCK) {
+            STOP();
+            DWT_Delay_us(MOTOR_DELAY);
+          }
+          direction = DIR_BCK;
+          break;
+
+        case CMD_LFT :
+          if (direction != DIR_BCK) {
+            STOP();
+            DWT_Delay_us(MOTOR_DELAY);
+          }
+          direction = DIR_LFT;          
+          break;
+
+        case CMD_RGT :
+          if (direction != DIR_BCK) {
+            STOP();
+            DWT_Delay_us(MOTOR_DELAY);
+          }
+          direction = DIR_RGT;
+          break;
+
+        case CMD_PWR :
+          DEBUG_TOGGLE();
+          break;
+
+        case CMD_BTN :
+          speed = SPEED_NONE;
+          break;
+      }
+
+      switch (direction) {
+        case DIR_FWD :
+          FORWARD(speed)
+          break;
+        case DIR_BCK :
+          REVERSE(speed)
+          break;
+        case DIR_LFT :
+          TURN_CCW(speed)
+          break;
+        case DIR_RGT :
+          TURN_CW(speed)
+          break;        
+      }
+    }
+	
+    data = 0;
+	  HAL_Delay(MAIN_DELAY);
   }
   /* USER CODE END 3 */
 }
