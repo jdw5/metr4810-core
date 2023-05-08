@@ -28,8 +28,8 @@ void ir_send_mark(uint32_t time) {
 	HAL_TIM_OC_Start(&htim3, TIM_CHANNEL_2); // Enable PWM output
 
 	if (time > 0) {
-        US_DELAY(time)
-    };
+        US_DELAY(time);
+    }
 }
 
 // Leave pin off for time (given in microseconds)
