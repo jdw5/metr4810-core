@@ -22,8 +22,10 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stdint.h"
-#include "motors.h"
-#include "ir_recv.h"
+//#include "motors.h"
+//#include "ir_recv.h"
+#include "dwt_stm32_delay.h"
+#include "stdio.h"
 
 /* USER CODE END Includes */
 
@@ -34,7 +36,22 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define PERIOD 625
+#define PERIOD      1000
+
+#define CMD_A       0xFF22DD
+#define CMD_B       0xFF02FD
+#define CMD_C       0xFFC23D
+#define CMD_FWD     0xFF9867
+#define CMD_BCK     0xFF38C7
+#define CMD_LFT     0xFF30CF
+#define CMD_RGT     0xFF7A85
+#define CMD_BTN     0xFF18E7
+#define CMD_PWR     0xFF629D
+
+#define SPEED_FAST  100
+#define SPEED_MED   50
+#define SPEED_SLOW  25
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -52,19 +69,11 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-unsigned char code;
-
-uint32_t tempCode;
-uint8_t bitIndex;
-uint8_t cmd;
-uint8_t cmdli;
-uint32_t code;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -72,14 +81,63 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM2_Init(void);
-static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+uint32_t data;
 
+uint32_t receive_data (void)
+{
+	uint32_t code = 0x00;
+
+		  /* The START Sequence begin here
+	   * there will be a pulse of 9ms LOW and
+	   * than 4.5 ms space (HIGH)
+	   */
+	int check = 0;
+	  while (!(HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4))) {
+		  // wait for the pin to go high.. 9ms LOW
+		  DWT_Delay_us(100);
+		  check++;
+	  };
+	  while ((HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4))) {
+		   // wait for the pin to go low.. 4.5ms HIGH
+		  if (check < 50) {
+			  return 0;
+		  }
+	  }
+
+
+	  /* DATA Reception
+	   * We are only going to check the SPACE after 562.5us pulse
+	   * if the space is 562.5us, the bit indicates '0'
+	   * if the space is around 1.6ms, the bit is '1'
+	   */
+    
+    uint8_t count;
+	  for (int i=0; i < 32; i++)
+	  {
+		  count = 0;
+
+		  while (!(HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4))); // wait for pin to go high.. this is 562.5us LOW
+
+		  while ((HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4)))  // count the space length while the pin is high
+		  {
+			  count++;
+			  DWT_Delay_us(100);
+		  }
+		  if (count > 12) // if the space is more than 1.2 ms
+		  {
+			  code |= (1UL << (31-i));   // write 1
+		  }
+
+		  else code &= ~(1UL << (31-i));  // write 0
+	  }
+		return code;
+}
 /* USER CODE END 0 */
 
 /**
@@ -111,26 +169,47 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   MX_TIM2_Init();
-  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
+  DWT_Delay_Init ();
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
-  HAL_TIM_Base_Start(&htim1);
-  HAL_TIM_SET_COUNTER(&htim1, 0);
-
-  DEBUG_OFF();
-  STOP();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  STOP();
+  DEBUG_OFF();
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  RIGHT_MOTOR_FORWARD(10);
-	  RIGHT_MOTOR_REVERSE(0);
+	  while ((HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4)));   // wait for the pin to go low
+	  data = receive_data();
+	  if (data > 0) {
+		  DEBUG_TOGGLE();
+	  }
+
+	  switch (data) {
+	  	  case 16750695:
+			  RIGHT_MOTOR_FORWARD(100);
+			  RIGHT_MOTOR_REVERSE(0);
+			  data = 0;
+			  break;
+	  	  case 16718055:
+	  		  STOP();
+	  		  data = 0;
+	  		  break;
+	  	  case 16726215:
+	  		  STOP();
+	  		  RIGHT_MOTOR_FORWARD(0);
+	  		  RIGHT_MOTOR_REVERSE(100);
+	  		  data = 0;
+	  		  break;
+
+	  }
+
+	  HAL_Delay(200);
   }
   /* USER CODE END 3 */
 }
@@ -177,53 +256,6 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-}
-
-/**
-  * @brief TIM1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM1_Init(void)
-{
-
-  /* USER CODE BEGIN TIM1_Init 0 */
-
-  /* USER CODE END TIM1_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM1_Init 1 */
-
-  /* USER CODE END TIM1_Init 1 */
-  htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 31;
-  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 65535;
-  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim1.Init.RepetitionCounter = 0;
-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM1_Init 2 */
-
-  /* USER CODE END TIM1_Init 2 */
-
 }
 
 /**
@@ -362,56 +394,17 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : IR_Receive_Pin */
-  GPIO_InitStruct.Pin = IR_Receive_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  /*Configure GPIO pin : PB4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_4;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(IR_Receive_GPIO_Port, &GPIO_InitStruct);
-
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-  if(GPIO_Pin == GPIO_PIN_11)
-  {
-    if (__HAL_TIM_GET_COUNTER(&htim1) > 8000)
-    {
-      tempCode = 0;
-      bitIndex = 0;
-    }
-    else if (__HAL_TIM_GET_COUNTER(&htim1) > 1700)
-    {
-      tempCode |= (1UL << (31-bitIndex));   // write 1
-      bitIndex++;
-    }
-    else if (__HAL_TIM_GET_COUNTER(&htim1) > 1000)
-    {
-      tempCode &= ~(1UL << (31 - bitIndex));  // write 0
-      bitIndex++;
-    }
-    if(bitIndex == 32)
-    {
-      cmdli = ~tempCode; // Logical inverted last 8 bits
-      cmd = tempCode >> 8; // Second last 8 bits
-      if(cmdli == cmd) // Check for errors
-      {
-        code = tempCode; // If no bit errors
-
-        // Main code
-
-      }
-      bitIndex = 0;
-    }
-    __HAL_TIM_SET_COUNTER(&htim1, 0);
-  }
-}
 
 
 /* USER CODE END 4 */
