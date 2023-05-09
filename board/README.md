@@ -17,15 +17,24 @@
 | PA5 | PWM Output | Motor Left Forward | TIM2_CHAN1 |
 | PB10 | PWM Output | Motor Left Reverse | TIM2_CHAN3 |
 
+## Config
+- 32kHZ clock
+- 1 timer, 4 channels
+- 1 GPIO OUT
+- 1 GPIO IN
+- 3V logic
+
 ## Command Values
-| Button | Decimal | Hex |
-| ------ | ------- | --- | 
-|    A   | 16720605 |     |
-|    B   | 16712445 |     |
-|    C   | 16761405 |     |
-|  FWD   | 16750695 |     |
-|  BCK   | 16726215 |     |
-|  LFT   | 16724175 |     |
-|  RGT   | 16743045 |     |
-|  PWR   | 16736925 |     |
-|  MID   | 16718055 |     |
+| Button |  Decimal |  Hex   |
+| ------ | -------- | ------ | 
+|    A   | 16720605 | FF22DD |
+|    B   | 16712445 | FF02FD |
+|    C   | 16761405 | FFC23D |
+|  FWD   | 16750695 | FF9867 |
+|  BCK   | 16726215 | FF38C7 |
+|  LFT   | 16724175 | FF30CF |
+|  RGT   | 16743045 | FF7A85 |
+|  PWR   | 16736925 | FF629D |
+|  BTN   | 16718055 | FF18E7 |
+
+
