@@ -36,24 +36,27 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define PERIOD      1000
+#define ARR      htim2.Instance.ARR
 
-#define CMD_A       0xFF22DD
-#define CMD_B       0xFF02FD
-#define CMD_C       0xFFC23D
-#define CMD_FWD     0xFF9867
-#define CMD_BCK     0xFF38C7
-#define CMD_LFT     0xFF30CF
-#define CMD_RGT     0xFF7A85
-#define CMD_BTN     0xFF18E7
-#define CMD_PWR     0xFF629D
+#define CMD_A       0x00FF22DD
+#define CMD_B       0x00FF02FD
+#define CMD_C       0x00FFC23D
+#define CMD_FWD     0x00FF9867
+#define CMD_BCK     0x00FF38C7
+#define CMD_LFT     0x00FF30CF
+#define CMD_RGT     0x00FF7A85
+#define CMD_BTN     0x00FF18E7
+#define CMD_PWR     0x00FF629D
+#define CMD_NONE    0x00000000
 
 #define SPEED_FAST  100
 #define SPEED_MED   50
 #define SPEED_SLOW  20
-#define SPEED_VSLOW  5
+#define SPEED_VSLOW 10
 #define SPEED_NONE  0
 
+#define FINE_MODE   0
+#define REG_MODE    1
 
 #define DIR_NONE    0
 #define DIR_FWD     1
@@ -62,7 +65,7 @@
 #define DIR_LFT     4
 
 #define MAIN_DELAY  200   // 200ms to ensure enough time to process
-#define MOTOR_DELAY 20    // time to stop motors to prevent jolting
+#define MOTOR_DELAY 100    // time to stop motors to prevent jolting
 
 
 /* USER CODE END PD */
@@ -74,10 +77,10 @@
 #define DEBUG_TOGGLE() HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13)
 #define READ_IR() HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4)
 
-#define RIGHT_MOTOR_FORWARD(value) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, (value * PERIOD) / 100)
-#define RIGHT_MOTOR_REVERSE(value) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, (value * PERIOD) / 100)
-#define LEFT_MOTOR_FORWARD(value) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, (value * PERIOD) / 100)
-#define LEFT_MOTOR_REVERSE(value) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, (value * PERIOD) / 100)
+#define RIGHT_MOTOR_FORWARD(value) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, (value * ARR) / 100)
+#define RIGHT_MOTOR_REVERSE(value) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, (value * ARR) / 100)
+#define LEFT_MOTOR_FORWARD(value) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, (value * ARR) / 100)
+#define LEFT_MOTOR_REVERSE(value) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, (value * ARR) / 100)
 
 #define FORWARD(speed) RIGHT_MOTOR_FORWARD(speed); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(speed); LEFT_MOTOR_REVERSE(SPEED_NONE)
 #define REVERSE(speed) RIGHT_MOTOR_REVERSE(speed); RIGHT_MOTOR_FORWARD(SPEED_NONE); LEFT_MOTOR_REVERSE(speed); LEFT_MOTOR_FORWARD(SPEED_NONE)
@@ -126,11 +129,11 @@ uint32_t receive_data (void)
 		  DWT_Delay_us(100);
 		  check++;
 	  };
+    if (check < 50) {
+      return 0;
+    }
 	  while (READ_IR()) {
 		   // wait for the pin to go low.. 4.5ms HIGH
-		  if (check < 50) {
-			  return 0;
-		  }
 	  }
 
 
@@ -192,12 +195,16 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   DWT_Delay_Init ();
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
   STOP();
   DEBUG_OFF();
   uint8_t speed = SPEED_SLOW;
   uint8_t direction = DIR_NONE;
+  uint32_t last_cmd = NULL;
+  uint8_t fineMode = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -205,83 +212,77 @@ int main(void)
   while (1) {
     /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */
-    
+
 	  while (READ_IR());   // Block while pin is high due to active high signal
 	  
     data = receive_data();
-	  if (data) {
+    
+    if (data) {
 		  DEBUG_TOGGLE();
 
-      switch (data) {
+      if (data == last_cmd) {
+        direction = DIR_NONE;
+        speed = SPEED_SLOW;
+        last_cmd = NULL;
+      } 
+      else {
+        last_cmd = data;
+        switch (data) {
 
-        case CMD_BTN :
-          direction = DIR_NONE;
-          break;
+          case CMD_BTN :
+            fineMode = !fineMode;
+            break;
 
-        case CMD_A :
-          speed = SPEED_SLOW;
-          break;
-
-        case CMD_B :
-          speed = SPEED_MED;
-          break;
-
-        case CMD_C :
-          speed = SPEED_FAST;
-          break;
-
-        case CMD_PWR :
-          speed = SPEED_VSLOW;
-          break;
-
-        case CMD_FWD :
-          if (direction != DIR_FWD) {
-            STOP();
-            DWT_Delay_us(MOTOR_DELAY);
-          }
-
-          if (speed == SPEED_NONE) {
+          case CMD_A :
             speed = SPEED_SLOW;
-          }
-          direction = DIR_FWD;
-          break;
+            break;
 
-        case CMD_BCK :
-          if (direction != DIR_BCK) {
-            STOP();
-            DWT_Delay_us(MOTOR_DELAY);
-          }
+          case CMD_B :
+            speed = SPEED_MED;
+            break;
 
-          if (speed == SPEED_NONE) {
-            speed = SPEED_SLOW;
-          }
-          direction = DIR_BCK;
-          break;
+          case CMD_C :
+            speed = SPEED_FAST;
+            break;
 
-        case CMD_LFT :
-          if (direction != DIR_BCK) {
-            STOP();
-            DWT_Delay_us(MOTOR_DELAY);
-          }
+          case CMD_PWR :
+            speed = SPEED_VSLOW;
+            break;
 
-          if (speed == SPEED_NONE) {
-            speed = SPEED_SLOW;
-          }
-          direction = DIR_LFT;          
-          break;
+          case CMD_FWD :
+            if (direction != DIR_FWD) {
+              STOP();
+              DWT_Delay_us(MOTOR_DELAY);
+            }
+            direction = DIR_FWD;
+            break;
 
-        case CMD_RGT :
-          if (direction != DIR_BCK) {
-            STOP();
-            DWT_Delay_us(MOTOR_DELAY);
-          }
+          case CMD_BCK :
+            if (direction != DIR_BCK) {
+              STOP();
+              DWT_Delay_us(MOTOR_DELAY);
+            }
+            direction = DIR_BCK;
+            break;
 
-          if (speed == SPEED_NONE) {
-            speed = SPEED_SLOW;
-          }
-          direction = DIR_RGT;
-          break;
+          case CMD_LFT :
+            if (direction != DIR_BCK) {
+              STOP();
+              DWT_Delay_us(MOTOR_DELAY);
+            }
+            direction = DIR_LFT;          
+            break;
+
+          case CMD_RGT :
+            if (direction != DIR_BCK) {
+              STOP();
+              DWT_Delay_us(MOTOR_DELAY);
+            }
+            direction = DIR_RGT;
+            break;
+        }
       }
+
 
       switch (direction) {
         case DIR_NONE :
@@ -289,19 +290,35 @@ int main(void)
           break;
 
         case DIR_FWD :
-          FORWARD(speed);
+          if (fineMode) {
+            FORWARD(speed/5);
+          } else {
+            FORWARD(speed);
+          }
           break;
 
         case DIR_BCK :
-          REVERSE(speed);
+          if (fineMode) {
+            REVERSE(speed/5);
+          } else {
+            REVERSE(speed);
+          }
           break;
 
         case DIR_LFT :
-          TURN_CCW(speed);
+          if (fineMode) {
+            TURN_CCW(SPEED_VSLOW);
+          } else {
+            TURN_CCW(SPEED_SLOW);
+          }
           break;
 
         case DIR_RGT :
-          TURN_CW(speed);
+          if (fineMode) {
+            TURN_CW(SPEED_VSLOW);
+          } else {
+            TURN_CW(SPEED_SLOW);
+          }
           break;        
       }
     }
