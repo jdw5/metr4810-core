@@ -105,54 +105,59 @@ static void MX_TIM2_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 uint32_t data;
+uint32_t val[66];
 
 /**
 * @brief Function to retrieve NEC encoded command
 * @retval Value received
 */
-uint32_t receive_data (void)
-{
+uint32_t receive_data(void) {
 	uint32_t code = 0x00;
 	int check = 0;
-	  while (!READ_IR()) {
-		  // wait for the pin to go high.. 9ms LOW
+	// 1500us space (1)
+	while (!READ_IR()) {
+		 // wait for the pin to go high.. 9ms LOW
 		  DWT_Delay_us(100);
 		  check++;
-	  };
+	};
 
-    if (check < 50) {
-      // Catch stray signals if the high is not 5ms, should be 9ms
+    val[0] = check;
+    if (check < 10) {
       return 0;
     }
 
-	  while (READ_IR()) {
-		   // Wait for the pin to go low.. 4.5ms HIGH
-	  }
+    check = 0;
+    while (READ_IR()) {
+    		 // wait for the pin to go high.. 9ms LOW
+    	DWT_Delay_us(100);
+    	check++;
+    }
+    if (check < 2) {
+          return 0;
+    }
 
-
-	  /*
-	   * We are only going to check the SPACE after 562.5us pulse
-	   * if the space is 562.5us, the bit indicates '0'
-	   * if the space is around 1.6ms, the bit is '1'
-	   */
-    
+	val[1] = check;
     uint8_t count;
-	  for (int i = 0; i < 32; i++) {
-		  count = 0;
-		  while (!READ_IR()); // Wait for 562us pulse for active high
-		  while (READ_IR()) { // Count space length
-			  count++;
-			  DWT_Delay_us(100);
-		  }
+	for (int i = 0; i < 22; i++) {
+		count = 0;
+		check = 0;
+		while (!READ_IR()) {
+			DWT_Delay_us(100); // Wait for 562us pulse for active high
+			count++;
+		}
+		while (READ_IR()) { // Count space length
+			DWT_Delay_us(100);
+			check++;
+		}
 
-		  if (count > 12) {// Low for more than 1.2ms
-			  code |= (1UL << (31-i));   // write 1
+		if (count > 7) {// Low for more than 1.2ms
+			  code |= (1UL << (i));   // write 1
 		  }
 		  else {
-        code &= ~(1UL << (31-i));  // write 0
-      }
-	  }
-		return code;
+			code &= ~(1UL << (i));  // write 0
+		  }
+	}
+	return code;
 }
 /* USER CODE END 0 */
 
@@ -193,9 +198,9 @@ int main(void)
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
   STOP();
   DEBUG_OFF();
-  uint8_t speed = SPEED_SLOW; //20
-  uint8_t direction = DIR_NONE; //0
-  uint32_t last_cmd = CMD_NONE; //0
+//  uint8_t speed = SPEED_SLOW; //20
+//  uint8_t direction = DIR_NONE; //0
+//  uint32_t last_cmd = CMD_NONE; //0
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -204,99 +209,14 @@ int main(void)
     /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */
 
-	  while (READ_IR());   // Block while pin is high due to active high signal
-	  
-    data = receive_data();
-    
-    if (data) {
-		  DEBUG_TOGGLE();
+	while (READ_IR());   // Block while pin is high due to active high signal	 DEBUG_TOGGLE();
 
-      if (data == last_cmd && data != CMD_PWR && data != CMD_A && data != CMD_B && data != CMD_C) {
-        direction = DIR_NONE;
-        last_cmd = CMD_NONE;
-      } 
-      else {
-        last_cmd = data;
-        switch (data) {
+	data = receive_data();
 
-          case CMD_BTN :
-            direction = DIR_NONE;
-            break;
-
-          case CMD_A :
-            speed = SPEED_VSLOW;
-            break;
-
-          case CMD_B :
-            speed = SPEED_SLOW;
-            break;
-
-          case CMD_C :
-            speed = SPEED_MED;
-            break;
-
-          case CMD_PWR :
-            speed = SPEED_FAST;
-            break;
-
-          case CMD_FWD :
-            if (direction != DIR_FWD) {
-              STOP();
-              DWT_Delay_us(MOTOR_DELAY);
-            }
-            direction = DIR_FWD;
-            break;
-
-          case CMD_BCK :
-            if (direction != DIR_BCK) {
-              STOP();
-              DWT_Delay_us(MOTOR_DELAY);
-            }
-            direction = DIR_BCK;
-            break;
-
-          case CMD_LFT :
-            if (direction != DIR_BCK) {
-              STOP();
-              DWT_Delay_us(MOTOR_DELAY);
-            }
-            direction = DIR_LFT;          
-            break;
-
-          case CMD_RGT :
-            if (direction != DIR_BCK) {
-              STOP();
-              DWT_Delay_us(MOTOR_DELAY);
-            }
-            direction = DIR_RGT;
-            break;
-        }
-      }
-
-      switch (direction) {
-        case DIR_NONE :
-          STOP();
-          break;
-
-        case DIR_FWD :
-          FORWARD(speed);
-          break;
-
-        case DIR_BCK :
-          REVERSE(speed);
-          break;
-
-        case DIR_LFT :
-          TURN_CCW(SPEED_VSLOW);
-          break;
-
-        case DIR_RGT :
-          TURN_CW(SPEED_VSLOW);
-          break;        
-      }
-    }
-    data = 0;
-	  HAL_Delay(MAIN_DELAY);
+	if (data) {
+		DEBUG_TOGGLE();
+	}
+	HAL_Delay(1000);
   }
   /* USER CODE END 3 */
 }
