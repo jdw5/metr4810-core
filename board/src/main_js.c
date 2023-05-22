@@ -1,20 +1,12 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2023 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+******************************************************************************
+* @file           : main.c
+* @author         : Team 4
+* @date           : 18/05/2023
+* @brief          : METR4810 main control for IR receiving and motor control
+******************************************************************************
+*/
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -34,53 +26,62 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define ARR             1000
 
-#define CMD_FWD         0x0C00F0
-#define CMD_BCK         0x0208F0
-#define CMD_LFT         0x0C040F
-#define CMD_RGT         0x08000F
-#define CMD_RELEASE     0x040000
-#define CMD_SPEED       0x248000
-#define CMD_STOP 	    0x242000
-#define CMD_NONE        0x000000
+// The autoreload register value used to compute duty cycle
+#define ARR                 1000
 
-#define SPEED_FAST      100
-#define SPEED_REGULAR   20
-#define TURN_SPEED_FAST 15
-#define TURN_SPEED_REGULAR   8
-#define SPEED_NONE      0
+// Hex representations of IR codes
+#define CMD_FWD             0x0C00F0
+#define CMD_BCK             0x0208F0
+#define CMD_LFT             0x0C040F
+#define CMD_RGT             0x08000F
+#define CMD_RELEASE         0x040000
+#define CMD_SPEED           0x248000
+#define CMD_STOP 	          0x242000
+#define CMD_NONE            0x000000
 
-#define DIR_NONE        0
-#define DIR_FWD         1
-#define DIR_BCK         2
-#define DIR_RGT         3
-#define DIR_LFT         4
+// Speed settings
+#define SPEED_FAST          100
+#define SPEED_REGULAR       20
+#define TURN_SPEED_FAST     15
+#define TURN_SPEED_REGULAR  8
+#define SPEED_NONE          0
 
-#define MAIN_DELAY  100   // 200ms to ensure enough time to process
-#define MOTOR_DELAY 80    // time to stop motors to prevent jolting
+// Direction macros for readability
+#define DIR_NONE            0
+#define DIR_FWD             1
+#define DIR_BCK             2
+#define DIR_RGT             3
+#define DIR_LFT             4
+
+#define MAIN_DELAY  100   // Block to prevent signal mixing
+#define MOTOR_DELAY 80    // Time in us to stop motors to prevent jolting
 
 
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
+
+// Pin read macros
 #define DEBUG_ON() HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET)
 #define DEBUG_OFF() HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET)
 #define DEBUG_TOGGLE() HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13)
 #define READ_IR() HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_4)
 
+// Macros for individual motor control
 #define RIGHT_MOTOR_FORWARD(value) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_4, (value * ARR) / 100)
 #define RIGHT_MOTOR_REVERSE(value) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, (value * ARR) / 100)
 #define LEFT_MOTOR_FORWARD(value) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, (value * ARR) / 100)
 #define LEFT_MOTOR_REVERSE(value) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, (value * ARR) / 100)
 
+// Direction macros
 #define FORWARD(speed) RIGHT_MOTOR_FORWARD(speed); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(speed); LEFT_MOTOR_REVERSE(SPEED_NONE)
 #define REVERSE(speed) RIGHT_MOTOR_REVERSE(speed); RIGHT_MOTOR_FORWARD(SPEED_NONE); LEFT_MOTOR_REVERSE(speed); LEFT_MOTOR_FORWARD(SPEED_NONE)
 #define TURN_CW(speed) RIGHT_MOTOR_FORWARD(SPEED_NONE); RIGHT_MOTOR_REVERSE(speed); LEFT_MOTOR_FORWARD(speed); LEFT_MOTOR_REVERSE(SPEED_NONE)
 #define TURN_CCW(speed) RIGHT_MOTOR_FORWARD(speed); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(SPEED_NONE); LEFT_MOTOR_REVERSE(speed)
-
 #define STOP() RIGHT_MOTOR_FORWARD(SPEED_NONE); RIGHT_MOTOR_REVERSE(SPEED_NONE); LEFT_MOTOR_FORWARD(SPEED_NONE); LEFT_MOTOR_REVERSE(SPEED_NONE)
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -111,33 +112,36 @@ uint32_t data;
 uint32_t receive_data(void) {
 	uint32_t code = 0x00;
 	int check = 0;
-	// 1500us space (1)
 	while (!READ_IR()) {
-		 // wait for the pin to go high.. 9ms LOW
+		 // Wait for the pin to go high indicated by active low
 		  DWT_Delay_us(100);
 		  check++;
 	}
-    if (check < 10) {
-      return 0;
-    }
+  // Check if the space is the required, else it could be a stray signal
+  if (check < 10) {
+    return 0;
+  }
 
-    check = 0;
-    while (READ_IR());
+  while (READ_IR()) {
+      // Wait for the pin to go low
+  }
 
+  // 22 bits of data
 	for (int i = 0; i < 22; i++) {
 		check = 0;
+    // Data is encoded on the high signals
 		while (!READ_IR()) {
 			DWT_Delay_us(100); // Wait for 562us pulse for active high
 			check++;
 		}
 		while (READ_IR());
-
-		if (check > 7) {// Low for more than 1.2ms
-			  code |= (1UL << (i));   // write 1
-		  }
-		  else {
+    
+		if (check > 7) { // For it to be a 1, needs to be high for 700us
+			code |= (1UL << (i));   // write 1
+		}
+		else {
 			code &= ~(1UL << (i));  // write 0
-		  }
+		}
 	}
 	return code;
 }
@@ -180,9 +184,9 @@ int main(void)
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
   STOP();
   DEBUG_OFF();
-  uint8_t speed = SPEED_REGULAR; //20
-  uint8_t direction = DIR_NONE; //0
-  uint32_t last_cmd = CMD_NONE; //0
+  uint8_t speed = SPEED_REGULAR;
+  uint8_t direction = DIR_NONE; 
+  uint32_t last_cmd = CMD_NONE; 
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -191,96 +195,100 @@ int main(void)
     /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */
 
-	while (READ_IR());   // Block while pin is high due to active high signal
+    while (READ_IR()) {
+      // Block while pin is high due to active high signal
+    }
+    // When goes active low, an IR signal is received
     data = receive_data();
 
+    // If the signal formed a valid code, modify state
     if (data) {
+      switch (data) {
+        case CMD_STOP :
+          direction = DIR_NONE;
+          break;
 
-        switch (data) {
-        	case CMD_STOP :
-        		direction = DIR_NONE;
-        		break;
+        case CMD_RELEASE :
+          if (last_cmd != CMD_SPEED || last_cmd != CMD_STOP) {
+            DEBUG_TOGGLE();
+            direction = DIR_NONE;
+          }
+          break;
 
-          case CMD_RELEASE :
-        	if (last_cmd != CMD_SPEED || last_cmd != CMD_STOP) {
-        		DEBUG_TOGGLE();
-        		direction = DIR_NONE;
-        	}
-            break;
+        case CMD_SPEED :
+          if (speed == SPEED_FAST) {
+            speed = SPEED_REGULAR;
+          } else {
+            speed = SPEED_FAST;
+          }
+          break;
 
-          case CMD_SPEED :
-            if (speed == SPEED_FAST) {
-            	speed = SPEED_REGULAR;
-            } else {
-            	speed = SPEED_FAST;
-            }
-            break;
-
-          case CMD_FWD :
-            if (direction != DIR_FWD) {
-              STOP();
-              DWT_Delay_us(MOTOR_DELAY);
-            }
-            direction = DIR_FWD;
-            break;
-
-          case CMD_BCK :
-            if (direction != DIR_BCK) {
-              STOP();
-              DWT_Delay_us(MOTOR_DELAY);
-            }
-            direction = DIR_BCK;
-            break;
-
-          case CMD_LFT :
-            if (direction != DIR_LFT) {
-              STOP();
-              DWT_Delay_us(MOTOR_DELAY);
-            }
-            direction = DIR_LFT;
-            break;
-
-          case CMD_RGT :
-            if (direction != DIR_RGT) {
-              STOP();
-              DWT_Delay_us(MOTOR_DELAY);
-            }
-            direction = DIR_RGT;
-            break;
-        }
-
-        switch (direction) {
-            case DIR_NONE :
+        case CMD_FWD :
+          if (direction != DIR_FWD) {
             STOP();
-            break;
+            DWT_Delay_us(MOTOR_DELAY);
+          }
+          direction = DIR_FWD;
+          break;
 
-            case DIR_FWD :
-            FORWARD(speed);
-            break;
+        case CMD_BCK :
+          if (direction != DIR_BCK) {
+            STOP();
+            DWT_Delay_us(MOTOR_DELAY);
+          }
+          direction = DIR_BCK;
+          break;
 
-            case DIR_BCK :
-            REVERSE(speed);
-            break;
+        case CMD_LFT :
+          if (direction != DIR_LFT) {
+            STOP();
+            DWT_Delay_us(MOTOR_DELAY);
+          }
+          direction = DIR_LFT;
+          break;
 
-            case DIR_LFT :
-            	if (speed == SPEED_FAST) {
-            		TURN_CCW(TURN_SPEED_FAST);
-            	} else {
-            		TURN_CCW(TURN_SPEED_REGULAR);
-            	}
-            break;
+        case CMD_RGT :
+          if (direction != DIR_RGT) {
+            STOP();
+            DWT_Delay_us(MOTOR_DELAY);
+          }
+          direction = DIR_RGT;
+          break;
+      }
 
-            case DIR_RGT :
-            	if (speed == SPEED_FAST) {
-					TURN_CW(TURN_SPEED_FAST);
-				} else {
-					TURN_CW(TURN_SPEED_REGULAR);
-				}
-            break;
-        }
-        last_cmd = data;
+      switch (direction) {
+        case DIR_NONE :
+          STOP();
+          break;
+
+        case DIR_FWD :
+          FORWARD(speed);
+          break;
+
+        case DIR_BCK :
+          REVERSE(speed);
+          break;
+
+        case DIR_LFT :
+          if (speed == SPEED_FAST) {
+            TURN_CCW(TURN_SPEED_FAST);
+          } else {
+            TURN_CCW(TURN_SPEED_REGULAR);
+          }
+          break;
+
+        case DIR_RGT :
+          if (speed == SPEED_FAST) {
+            TURN_CW(TURN_SPEED_FAST);
+          } else {
+            TURN_CW(TURN_SPEED_REGULAR);
+          }
+          break;
+      }
+      // Set last command to current to check if double pressed
+      last_cmd = data;
     }
-	HAL_Delay(MAIN_DELAY);
+	  HAL_Delay(MAIN_DELAY);
   }
   /* USER CODE END 3 */
 }
